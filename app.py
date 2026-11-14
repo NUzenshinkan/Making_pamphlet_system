@@ -17,24 +17,24 @@ st.write("CSVデータと背景画像をアップロードするだけで、部�
 with st.expander("０．📖 使い方", expanded=True):
     st.markdown("""
     **【最初にやって欲しいこと】**\\
-    １．**文字数制限**: Googleフォームの紹介文はレイアウトに合わせて字数制限を設けてください。\\
-    ２．**画像フォルダの権限**: 回答画像が保存されるGoogleドライブのフォルダは、作業中のみアクセス権を「リンクを知っている全員」に変更してください（終わったら戻してOKです）。
+    1. **文字数制限**: Googleフォームの紹介文はレイアウトに合わせて字数制限を設けてください。\\
+    2. **画像フォルダの権限**: 回答画像が保存されるGoogleドライブのフォルダは、作業中のみアクセス権を「リンクを知っている全員」に変更してください（終わったら戻してOKです）。
 
     **【操作手順】**\\
     １．下のプルダウンからお好みの「レイアウト」を選びます。\\
     ２．フォームからダウンロードした「CSVデータ」をアップロードします。\\
     ３．「部活用」と「サークル用」の背景画像（JPG/PNG）をアップロードします。\\
-    ４．「🚀 PDFを生成する」ボタンを押してしばらく待ちます。\\
-    ５．下に出てくるボタンから完成したPDFをダウンロード！
+    ４．（任意）事前に作成した「表紙PDF」があればアップロードします。\\
+    ５．「🚀 PDFを生成する」ボタンを押してしばらく待ちます。\\
+    ６．下に出てくるボタンから完成したPDFをダウンロード！
     """)
     
-    # === 今回の追加部分：マニュアルPDFのダウンロードボタン ===
     if os.path.exists("manual.pdf"):
         with open("manual.pdf", "rb") as f:
             st.download_button(
-                label="📄 使用マニュアル.pdf",
+                label="📄 印刷・配布用のマニュアルPDFをダウンロード",
                 data=f,
-                file_name="おめぱん自動生成システム_使用マニュアル.pdf",
+                file_name="新歓パンフ自動生成システム_マニュアル.pdf",
                 mime="application/pdf"
             )
 
@@ -48,6 +48,14 @@ layout_mode = st.selectbox(
 csv_file = st.file_uploader("📊 回答データのCSV", type=["csv"])
 bg_bukatsu_file = st.file_uploader("🖼️ 部活用の背景画像", type=["jpg", "jpeg", "png"])
 bg_circle_file = st.file_uploader("🖼️ サークル用の背景画像", type=["jpg", "jpeg", "png"])
+
+# === 追加：表紙PDFのアップロード枠 ===
+st.write("---")
+st.subheader("【オプション】表紙の追加")
+st.write("あらかじめ作成した表紙PDFがある場合は、ここでアップロードすると自動で先頭に結合されます。")
+cover_bukatsu_file = st.file_uploader("📕 部活パンフの表紙PDF（任意）", type=["pdf"])
+cover_circle_file = st.file_uploader("📕 サークルパンフの表紙PDF（任意）", type=["pdf"])
+st.write("---")
 
 FONT_PATH_TITLE = "NotoSansJP-Medium.ttf"
 FONT_PATH_TEXT = "NotoSansJP-Regular.ttf"
@@ -294,10 +302,10 @@ def generate_toc_pages(df, bg_image, title_text, start_page_num, mode):
 # 3. 実行ボタンとダウンロード
 # ==========================================
 st.header("２．PDFの生成")
-if st.button("PDFを生成する"):
+if st.button("🚀 PDFを生成する"):
     if csv_file and bg_bukatsu_file and bg_circle_file:
         try:
-            with st.spinner("画像のダウンロードとPDFの生成を行っています。しばらくお待ちください..."):
+            with st.spinner("データの処理とPDFの生成を行っています。しばらくお待ちください..."):
                 df = pd.read_csv(csv_file)
                 df_bukatsu = df[df['区分'] == '部活']
                 df_circle = df[df['区分'] == 'サークル']
@@ -306,18 +314,33 @@ if st.button("PDFを生成する"):
                 bg_b_img = Image.open(bg_bukatsu_file).convert("RGB")
                 bg_c_img = Image.open(bg_circle_file).convert("RGB")
 
+                # --- 【新規】アップロードされた表紙PDFの処理 ---
+                cover_b_pages = []
+                if cover_bukatsu_file:
+                    with open("temp_cover_b.pdf", "wb") as f:
+                        f.write(cover_bukatsu_file.read())
+                    cover_b_pages = [p.convert("RGB") for p in convert_from_path("temp_cover_b.pdf", dpi=300)]
+                    if os.path.exists("temp_cover_b.pdf"): os.remove("temp_cover_b.pdf")
+
+                cover_c_pages = []
+                if cover_circle_file:
+                    with open("temp_cover_c.pdf", "wb") as f:
+                        f.write(cover_circle_file.read())
+                    cover_c_pages = [p.convert("RGB") for p in convert_from_path("temp_cover_c.pdf", dpi=300)]
+                    if os.path.exists("temp_cover_c.pdf"): os.remove("temp_cover_c.pdf")
+
                 # --- 部活PDFの生成 ---
                 pages_bukatsu = generate_pages_only(df_bukatsu, bg_b_img, layout_mode)
                 toc_bukatsu = generate_toc_pages(df_bukatsu, bg_b_img, "部活 目次", 1, layout_mode)
                 if pages_bukatsu:
-                    out_b = toc_bukatsu + pages_bukatsu
+                    out_b = cover_b_pages + toc_bukatsu + pages_bukatsu
                     out_b[0].save("部活.pdf", save_all=True, append_images=out_b[1:], resolution=300.0)
 
                 # --- サークルPDFの生成 ---
                 pages_circle = generate_pages_only(df_circle, bg_c_img, layout_mode)
                 toc_circle = generate_toc_pages(df_circle, bg_c_img, "サークル 目次", 1, layout_mode)
                 if pages_circle:
-                    out_c = toc_circle + pages_circle
+                    out_c = cover_c_pages + toc_circle + pages_circle
                     out_c[0].save("サークル.pdf", save_all=True, append_images=out_c[1:], resolution=300.0)
 
             st.success("✅ 生成が完了しました！以下のボタンからダウンロードしてください。")
@@ -334,4 +357,4 @@ if st.button("PDFを生成する"):
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
     else:
-        st.warning("⚠️ CSVと2つの背景画像をすべてアップロードしてください。")
+        st.warning("⚠️ CSVと2つの背景画像をすべてアップロードしてください（表紙は任意です）。")
