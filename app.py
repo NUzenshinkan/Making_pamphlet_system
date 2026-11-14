@@ -48,14 +48,8 @@ layout_mode = st.selectbox(
 csv_file = st.file_uploader("📊 回答データのCSV", type=["csv"])
 bg_bukatsu_file = st.file_uploader("🖼️ 部活用の背景画像", type=["jpg", "jpeg", "png"])
 bg_circle_file = st.file_uploader("🖼️ サークル用の背景画像", type=["jpg", "jpeg", "png"])
-
-# === 追加：表紙PDFのアップロード枠 ===
-st.write("---")
-st.subheader("【オプション】表紙の追加")
-st.write("あらかじめ作成した表紙PDFがある場合は、ここでアップロードすると自動で先頭に結合されます。")
 cover_bukatsu_file = st.file_uploader("📕 部活パンフの表紙PDF（任意）", type=["pdf"])
 cover_circle_file = st.file_uploader("📕 サークルパンフの表紙PDF（任意）", type=["pdf"])
-st.write("---")
 
 FONT_PATH_TITLE = "NotoSansJP-Medium.ttf"
 FONT_PATH_TEXT = "NotoSansJP-Regular.ttf"
