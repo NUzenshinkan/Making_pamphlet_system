@@ -11,14 +11,14 @@ from pdf2image import convert_from_path
 # ==========================================
 st.set_page_config(page_title="おめぱん自動生成システム", layout="centered")
 st.title("おめぱん自動生成システム")
-st.write("CSVデータと背景画像をアップロードするだけで、部活・サークル紹介のPDF冊子を自動生成します。")
+st.write("CSVデータと背景画像と表紙をアップロードするだけで、部活・サークル紹介のPDF冊子を自動生成します。")
 
 # 🌟 画面上のマニュアル部分
 with st.expander("０．📖 使い方", expanded=True):
     st.markdown("""
     **【最初にやって欲しいこと】**\\
-    1. **文字数制限**: Googleフォームの紹介文はレイアウトに合わせて字数制限を設けてください。\\
-    2. **画像フォルダの権限**: 回答画像が保存されるGoogleドライブのフォルダは、作業中のみアクセス権を「リンクを知っている全員」に変更してください（終わったら戻してOKです）。
+    １．**文字数制限**: Googleフォームの紹介文はレイアウトに合わせて字数制限を設けてください。\\
+    ２．**画像フォルダの権限**: 回答画像が保存されるGoogleドライブのフォルダは、作業中のみアクセス権を「リンクを知っている全員」に変更してください（終わったら戻してOKです）。
 
     **【操作手順】**\\
     １．下のプルダウンからお好みの「レイアウト」を選びます。\\
@@ -32,9 +32,9 @@ with st.expander("０．📖 使い方", expanded=True):
     if os.path.exists("manual.pdf"):
         with open("manual.pdf", "rb") as f:
             st.download_button(
-                label="📄 印刷・配布用のマニュアルPDFをダウンロード",
+                label="📄 使用マニュアル",
                 data=f,
-                file_name="新歓パンフ自動生成システム_マニュアル.pdf",
+                file_name="おめぱん自動生成システム_使用マニュアル.pdf",
                 mime="application/pdf"
             )
 
