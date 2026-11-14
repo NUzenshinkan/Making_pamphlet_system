@@ -205,4 +205,133 @@ def process_slot(bg_img, data_row, slot_coords, mode):
         while draw.textlength(title_text, font=t_font) > slot_w and cur_t_size > 10:
             cur_t_size -= 2
             t_font = ImageFont.truetype(FONT_PATH_TITLE, cur_t_size)
-        draw.text((x1, y1), title_text, font=t_font,
+        draw.text((x1, y1), title_text, font=t_font, fill=(0, 0, 0))
+        con_y = y1 + cur_t_size + spc
+        bg_img.paste(ImageOps.pad(content_img, (ph_w, ph_h), color=(255, 255, 255), method=Image.Resampling.LANCZOS), (x1, con_y))
+        cur_txt_size = int(slot_h*0.03)
+        while True:
+            txt_font = ImageFont.truetype(FONT_PATH_TEXT, cur_txt_size)
+            bot_y = wrap_and_draw_floating_text(text_data, txt_font, draw, x1, con_y, ph_w, ph_h, slot_w, gap, do_draw=False)
+            if bot_y <= (y1 + slot_h) or cur_txt_size <= 10: break
+            cur_txt_size -= 2
+        wrap_and_draw_floating_text(text_data, txt_font, draw, x1, con_y, ph_w, ph_h, slot_w, gap, do_draw=True)
+
+    elif mode == "1枠縦積み":
+        ph_h = int(slot_h*0.40)
+        cur_t_size, spc = int(slot_h*0.07), int(slot_h*0.04)
+        t_font = ImageFont.truetype(FONT_PATH_TITLE, cur_t_size)
+        while draw.textlength(title_text, font=t_font) > slot_w and cur_t_size > 10:
+            cur_t_size -= 2
+            t_font = ImageFont.truetype(FONT_PATH_TITLE, cur_t_size)
+        draw.text((x1, y1), title_text, font=t_font, fill=(0, 0, 0))
+        ph_y = y1 + cur_t_size + spc
+        bg_img.paste(ImageOps.pad(content_img, (slot_w, ph_h), color=(255, 255, 255), method=Image.Resampling.LANCZOS), (x1, ph_y))
+        txt_y = ph_y + ph_h + spc
+        max_h = (y1 + slot_h) - txt_y
+        cur_txt_size = int(slot_h*0.04)
+        while True:
+            txt_font = ImageFont.truetype(FONT_PATH_TEXT, cur_txt_size)
+            wrp_txt = wrap_japanese_text(text_data, txt_font, draw, slot_w)
+            bbox = draw.multiline_textbbox((0, 0), wrp_txt, font=txt_font, spacing=int(cur_txt_size*0.5))
+            if (bbox[3]-bbox[1]) <= max_h or cur_txt_size <= 10: break
+            cur_txt_size -= 2
+        draw.multiline_text((x1, txt_y), wrp_txt, font=txt_font, fill=(0, 0, 0), spacing=int(cur_txt_size*0.5))
+
+    if os.path.exists(temp_img_path): os.remove(temp_img_path)
+
+def generate_pages_only(df, bg_image, mode):
+    pages, step = [], get_items_per_page(mode)
+    if df.empty: return []
+    for i in range(0, len(df), step):
+        chunk = df.iloc[i:i+step]
+        page_img = bg_image.copy()
+        slots = calculate_slots(mode, page_img.size[0], page_img.size[1])
+        for j, (_, row) in enumerate(chunk.iterrows()):
+            process_slot(page_img, row, slots[j], mode)
+        page_img.info['dpi'] = (300, 300)
+        pages.append(page_img)
+    return pages
+
+def generate_toc_pages(df, bg_image, title_text, start_page_num, mode):
+    if df.empty: return []
+    step = get_items_per_page(mode)
+    base_bg = bg_image.copy()
+    bg_w, bg_h = base_bg.size
+    margin_x, margin_y = int(bg_w * 0.1), int(bg_h * 0.12)
+    font_toc_title = ImageFont.truetype(FONT_PATH_TITLE, 100)
+    font_toc_item = ImageFont.truetype(FONT_PATH_TEXT, 45)
+    
+    items_per_col = 50
+    items_per_page = items_per_col * 2
+    toc_pages = []
+    
+    for page_idx in range(0, len(df), items_per_page):
+        chunk = df.iloc[page_idx : page_idx + items_per_page]
+        page_img = base_bg.copy()
+        draw = ImageDraw.Draw(page_img)
+        draw.text((margin_x, margin_y - 120), f"■ {title_text}", font=font_toc_title, fill=(0, 0, 0))
+        y_start, col_width = margin_y + 80, int(bg_w * 0.4)
+        
+        for i, (orig_idx, row) in enumerate(chunk.iterrows()):
+            global_idx = page_idx + i
+            p_num = start_page_num + (global_idx // step)
+            col, row_in_col = i // items_per_col, i % items_per_col
+            x = margin_x + (col * col_width) + (col * 150)
+            y = y_start + (row_in_col * 60)
+            name = str(row['団体名'])
+            while draw.textlength(name, font=font_toc_item) > (col_width - 100):
+                name = name[:-2] + "…"
+            draw.text((x, y), name, font=font_toc_item, fill=(0, 0, 0))
+            draw.text((x + col_width - 50, y), f"p.{p_num}", font=font_toc_item, fill=(0, 0, 0))
+            dot_x_start = x + draw.textlength(name, font=font_toc_item) + 20
+            dot_x_end = x + col_width - 70
+            draw.text((dot_x_start, y), "." * int((dot_x_end - dot_x_start)/15), font=font_toc_item, fill=(150, 150, 150))
+        page_img.info['dpi'] = (300, 300)
+        toc_pages.append(page_img)
+    return toc_pages
+
+# ==========================================
+# 3. 実行ボタンとダウンロード
+# ==========================================
+st.header("２．PDFの生成")
+if st.button("PDFを生成する"):
+    if csv_file and bg_bukatsu_file and bg_circle_file:
+        try:
+            with st.spinner("画像のダウンロードとPDFの生成を行っています。しばらくお待ちください..."):
+                df = pd.read_csv(csv_file)
+                df_bukatsu = df[df['区分'] == '部活']
+                df_circle = df[df['区分'] == 'サークル']
+
+                # 背景画像をメモリ上で開く
+                bg_b_img = Image.open(bg_bukatsu_file).convert("RGB")
+                bg_c_img = Image.open(bg_circle_file).convert("RGB")
+
+                # --- 部活PDFの生成 ---
+                pages_bukatsu = generate_pages_only(df_bukatsu, bg_b_img, layout_mode)
+                toc_bukatsu = generate_toc_pages(df_bukatsu, bg_b_img, "部活 目次", 1, layout_mode)
+                if pages_bukatsu:
+                    out_b = toc_bukatsu + pages_bukatsu
+                    out_b[0].save("部活.pdf", save_all=True, append_images=out_b[1:], resolution=300.0)
+
+                # --- サークルPDFの生成 ---
+                pages_circle = generate_pages_only(df_circle, bg_c_img, layout_mode)
+                toc_circle = generate_toc_pages(df_circle, bg_c_img, "サークル 目次", 1, layout_mode)
+                if pages_circle:
+                    out_c = toc_circle + pages_circle
+                    out_c[0].save("サークル.pdf", save_all=True, append_images=out_c[1:], resolution=300.0)
+
+            st.success("✅ 生成が完了しました！以下のボタンからダウンロードしてください。")
+            
+            # ダウンロードボタンの表示
+            col1, col2 = st.columns(2)
+            if os.path.exists("部活.pdf"):
+                with open("部活.pdf", "rb") as f:
+                    col1.download_button("📥 部活.pdf をダウンロード", f, file_name="部活パンフレット.pdf")
+            if os.path.exists("サークル.pdf"):
+                with open("サークル.pdf", "rb") as f:
+                    col2.download_button("📥 サークル.pdf をダウンロード", f, file_name="サークルパンフレット.pdf")
+
+        except Exception as e:
+            st.error(f"エラーが発生しました: {e}")
+    else:
+        st.warning("⚠️ CSVと2つの背景画像をすべてアップロードしてください。")
