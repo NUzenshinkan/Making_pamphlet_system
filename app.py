@@ -1,9 +1,3 @@
-!unzip images.zip -d images/
-!unzip flyers.zip -d images/
-
-!apt-get -y install poppler-utils
-!pip install pdf2image
-
 import streamlit as st
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont, ImageOps
